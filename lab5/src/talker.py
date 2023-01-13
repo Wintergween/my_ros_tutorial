@@ -15,8 +15,8 @@ if __name__ == '__main__':
         c.id = cur; c.text = "abc"
         rospy.loginfo(cur)
 
-        pub.publish(cur, "abc")
-        # pub.publish(c)
+        #pub.publish(cur, "abc")
+        pub.publish(c)
 
         rate.sleep()
         cur += 1
