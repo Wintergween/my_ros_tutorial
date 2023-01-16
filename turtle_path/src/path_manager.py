@@ -2,63 +2,115 @@
 import rospy
 from math import pi, fmod, sin, cos, sqrt
 from geometry_msgs.msg import Twist
-# hint: some imports are missing
+from turtlesim.msg import Pose
+from turtle_path.srv import *
 
 cur_pos = Pose()
 
 def cb_pose(data): # get the current position from subscribing the turtle position
-    global cur_pos
-    cur_pos = data
+  global cur_pos
+  cur_pos = data
 
-def cb_walk(req):
-    if (req.distance < 0):
-        return False
-
-    # hint: calculate the projected (x, y) after walking the distance,
-    # and return false if it is outside the boundary
-
-    rate = rospy.Rate(100) # 100Hz control loop
-
-    while ('''goal not reached'''): # control loop
-        
-        # in each iteration of the control loop, publish a velocity
-
-        # hint: you need to use the formula for distance between two points
-        
-        rate.sleep()
+def cb_walk(req):  
+  vel = Twist()
+  
+  if(req.distance < 0):
+      return False
+  
+  if(cur_pos.theta < 0.0):
+    theta = cur_pos.theta + 2 * pi
+  else:
+    theta = cur_pos.theta
+  
+  #global dest_x  #For use with debug function cb_orientation
+  #global dest_y
+  
+  dest_x = req.distance * cos(theta) + cur_pos.x
+  dest_y = req.distance * sin(theta) + cur_pos.y
+  
+  if(dest_x > 11.0 or dest_x < 0.0):
+    return False
+  elif(dest_y > 11.0 or dest_y < 0.0):
+    return False
+  
+  #print(f'dest x: {dest_x}')
+  #print(f'dest y: {dest_y}')
     
-    vel = Twist() # publish a velocity 0 at the end, to ensure the turtle really stops
-    pub.publish(vel)
+  dest_dist = 1.0
 
-    return True
+  rate = rospy.Rate(100) # 100Hz control loop
+
+  while (dest_dist > 0.01): # control loop
+    dest_dist = sqrt((dest_y - cur_pos.y) ** 2 + (dest_x - cur_pos.x) ** 2)
+    
+    #print(f'dest dist: {dest_dist}')
+    
+    if(dest_dist >= 0.2):
+      vel.linear.x = 10
+    elif(dest_dist > 0.02):
+      vel.linear.x = 0.25
+    elif(dest_dist > 0.0):
+      vel.linear.x = 0.01
+    else:
+      print("Error going Destination")
+    
+    pub.publish(vel)    
+    rate.sleep()
+
+  return True
+  
+#def cb_orientation(req): # For debug only, need to disable the original cb_orientation
+#  dest_diff = sqrt((dest_y - cur_pos.y) ** 2 + (dest_x - cur_pos.x) ** 2)
+#  print(f'ex dest diff: {dest_diff}')
+#  return True
+
+#def cb_walk(req): # For debug only, need to disable the original cb_walk
+#  dist = fmod(targ_rads - cur_pos.theta + pi + 2 * pi, 2 * pi) - pi
+#  print(f'ex dist rad: {dist}')
+#  return True
 
 def cb_orientation(req):
 
-    rate = rospy.Rate(100) # 100Hz control loop
+  rate = rospy.Rate(100) # 100Hz control loop
+  dist = 1.0
+  vel = Twist()
     
-    while ('''goal not reached'''): # control loop
-        
-        # in each iteration of the control loop, publish a velocity
-
-        # hint: signed smallest distance between two angles: 
-        # see https://stackoverflow.com/questions/1878907/the-smallest-difference-between-2-angles
-        #     dist = fmod(req.orientation - cur_pos.theta + pi + 2 * pi, 2 * pi) - pi
-        
-        rate.sleep()
+  while (dist > 0.01 or dist < -0.01): # control loop
+    dist = fmod(req.orientation - cur_pos.theta + pi + 2 * pi, 2 * pi) - pi
     
-    vel = Twist() # publish a velocity 0 at the end, to ensure the turtle really stops
+    #global targ_rads   #For use with debug function cb_walk
+    #targ_rads = req.orientation
+    
+    if(dist >= 0.2):
+      vel.angular.z = 10
+    elif(dist > 0.02):
+      vel.angular.z = 0.25
+    elif(dist > 0.0):
+      vel.angular.z = 0.01
+    elif(dist <= -0.2):
+      vel.angular.z = -10
+    elif(dist < -0.02):
+      vel.angular.z = -0.5
+    elif(dist < 0.0):
+      vel.angular.z = -0.01
+    else:
+      print("Error Setting Orientation")
+    
+    #print(f'dist rad: {dist}')
     pub.publish(vel)
-
-    return True
+    rate.sleep()
+  
+  return True
 
 if __name__ == '__main__':
-    rospy.init_node('path_manager')
+  rospy.init_node('path_manager')
+  
+  #Topics
+  pub = rospy.Publisher('turtle1/cmd_vel', Twist, queue_size = 1)
+  sub = rospy.Subscriber('turtle1/pose', Pose, cb_pose)
+  
+  #Services  
+  rospy.Service('walk_distance', WalkDistance, cb_walk)
+  rospy.Service('set_orientation', SetOrientation, cb_orientation)
     
-    pub = # publisher of the turtle velocity
-    sub = # subscriber of the turtle position, callback to cb_pose
-    
-    ## init each service server here:
-    # rospy.Service( ... )		# callback to cb_orientation
-    # rospy.Service( ... )		# callback to cb_walk
-    
-    rospy.spin()
+  rospy.spin()
